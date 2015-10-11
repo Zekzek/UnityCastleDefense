@@ -50,6 +50,7 @@
      <Compile Include="Assets\Scripts\Maps.cs" />
      <Compile Include="Assets\Scripts\PathfinderPath.cs" />
      <Compile Include="Assets\Scripts\PathfinderTile.cs" />
+     <Compile Include="Assets\Scripts\Projectile.cs" />
      <Compile Include="Assets\Scripts\ThreadedPathfinder.cs" />
      <Compile Include="Assets\Scripts\Tile.cs" />
      <Compile Include="Assets\Scripts\Unit.cs" />

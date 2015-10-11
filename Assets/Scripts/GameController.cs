@@ -4,12 +4,10 @@ using System.Collections.Generic;
 
 public class GameController : MonoBehaviour {
 	public GameObject unitPrefab;
+	public GameObject projectilePrefab;
+	public GameObject flagPrefab;
 	public GameObject rampPrefab;
 	public GameObject[] blockPrefabs;
-
-	private const int mapYSize = 4;
-	private const int mapXSize = 21;
-	private const int mapZSize = 11;
 	
 	public char[,,] initialLayout = Maps.kingOfTheHill;
 	private List<Tile> tileList = new List<Tile>();
@@ -20,10 +18,10 @@ public class GameController : MonoBehaviour {
 
 	void Start () {
 		finder = new ThreadedPathfinder ();
-		for (int x = 0; x < mapXSize; x++) {
-			for (int y = 0; y < mapYSize-1; y++) {
-				for (int z = 0; z < mapZSize; z++) {
-					int[] indexPos = new int[] {x, y, mapZSize - 1 - z};
+		for (int x = 0; x < Maps.mapXSize; x++) {
+			for (int y = 0; y < Maps.mapYSize; y++) {
+				for (int z = 0; z < Maps.mapZSize; z++) {
+					int[] indexPos = new int[] {x, y, Maps.mapZSize - 1 - z};
 					// initialLayout encoded y,z,x(with z inverted) for easy visualization
 					if (initialLayout [y, z, x] == 'B') {
 						AddTile (GetRandomBlockPrefab (), indexPos, Tile.TILE_TYPE.Block);
@@ -37,6 +35,8 @@ public class GameController : MonoBehaviour {
 						AddTile (rampPrefab, indexPos, Tile.TILE_TYPE.Ramp_S);
 					} else if (initialLayout [y, z, x] == 'W') {
 						AddTile (rampPrefab, indexPos, Tile.TILE_TYPE.Ramp_W);
+					} else if (initialLayout [y, z, x] == 'F') {
+						AddFlag (indexPos);
 					}
 				}
 			}
@@ -45,8 +45,8 @@ public class GameController : MonoBehaviour {
 		removeTileAt(new int[] {10, 1, 5});
 		finder.Pack ();
 
-		Unit unit1 = addUnit (new int[] {1, 2, 1});
-		Unit unit2 = addUnit (new int[] {19, 2, 10});
+		Unit unit1 = AddUnit (new int[] {1, 2, 1});
+		Unit unit2 = AddUnit (new int[] {19, 2, 10});
 	}
 
 	void Update() {
@@ -80,7 +80,7 @@ public class GameController : MonoBehaviour {
 		return blockPrefabs[Mathf.FloorToInt(Random.value * blockPrefabs.Length)];
 	}
 	
-	private Unit addUnit(int[] indexPos) {
+	private Unit AddUnit(int[] indexPos) {
 		Vector3 position = new Vector3 
 			(indexPos[0] * Tile.BLOCK_SIZE[0], indexPos[1] * Tile.BLOCK_SIZE[1], indexPos[2] + Tile.BLOCK_SIZE[2]);
 		GameObject unitObject = (GameObject) Instantiate (unitPrefab, position, Quaternion.identity);
@@ -89,6 +89,21 @@ public class GameController : MonoBehaviour {
 		aUnit.OnTile = getTileAtIndex (new int[] {indexPos[0], indexPos[1] - 1, indexPos[2]});
 		aUnit.UpdateUnityPosition ();
 		return aUnit;
+	}
+
+	private void AddFlag(int[] indexPos) {
+		Vector3 position = new Vector3 
+			(indexPos[0] * Tile.BLOCK_SIZE[0], indexPos[1] * Tile.BLOCK_SIZE[1], indexPos[2] + Tile.BLOCK_SIZE[2]);
+		GameObject flagObject = (GameObject) Instantiate (flagPrefab, position, Quaternion.identity);
+		flagObject.transform.rotation = Quaternion.Euler(new Vector3(-90, -30, 0));
+
+		Debug.Log ("Flag added at " + indexPos [0] + "," + indexPos [1] + "," + indexPos [2]);
+
+		//Unit aUnit = unitObject.GetComponent(typeof(Unit)) as Unit;
+		//aUnit.Controller = this;
+		//aUnit.OnTile = getTileAtIndex (new int[] {indexPos[0], indexPos[1] - 1, indexPos[2]});
+		//aUnit.UpdateUnityPosition ();
+		//return aUnit;
 	}
 
 	private Tile getTileAt(Vector3 position) {
@@ -136,61 +151,12 @@ public class GameController : MonoBehaviour {
 	}
 
 	public void ClickedUnit(Unit aUnit) {
+		if (clickedUnit != null && clickedUnit != aUnit) {
+			GameObject arrowObject = (GameObject) Instantiate (projectilePrefab, 
+				clickedUnit.gameObject.transform.position, Quaternion.identity);
+			Projectile aProjectile = arrowObject.GetComponent(typeof(Projectile)) as Projectile;
+			aProjectile.Fire (clickedUnit, aUnit, 5);
+		}
 		clickedUnit = aUnit;
 	}
-
-	/*private ScoredTileList getShortestPath(Tile start, Tile end) {
-		Debug.Log("Shortest path between " + start.ToString() + " and " + end.ToString());
-
-
-		List<Tile> explored = new List<Tile> ();
-		List<ScoredTileList> frontier = new List<ScoredTileList> ();
-		ScoredTileList path = gameObject.AddComponent<ScoredTileList>() as ScoredTileList;
-
-		path.AddTile (start);
-		frontier.Add (path);
-
-		while(true) {
-			if (frontier.Count == 0) {
-				return null; //failed to find a path
-			}
-			double lowestCost = double.MaxValue;
-			int lowestCostIndex = 0;
-			for (int i = 0; i < frontier.Count; i++) {
-				if (frontier[i].Cost < lowestCost) {
-					lowestCost = frontier[i].Cost;
-					lowestCostIndex = i;
-				}
-			}
-			path = frontier[lowestCostIndex];
-			if (path.EndTile.matchesPosition(end)) {
-				return path;
-			}
-			frontier.RemoveAt(lowestCostIndex);
-			explored.Add(path.EndTile);
-			List<Tile> neighbors = path.EndTile.Neighbors;
-			for (int i = 0; i < neighbors.Count; i++) {
-				if (!explored.Contains(neighbors[i])) {
-					int index = -1;
-					for (int j = 0; j < frontier.Count; j++) {
-						if (frontier[j].EndTile.Equals(neighbors[i])) {
-							index = j;
-							break;
-						}
-					}
-					if(index < 0) {
-						ScoredTileList neighborPath = gameObject.AddComponent<ScoredTileList>() as ScoredTileList;
-						neighborPath.copy(path);
-						neighborPath.AddTile(neighbors[i]);
-						if (!double.IsNaN(neighborPath.Cost)) {
-                    		frontier.Add (neighborPath);
-						}
-					}
-					else if (frontier[index].Cost < path.Cost) {
-						path = frontier[index];
-					}
-				}
-			}
-		}
-	}*/
 }

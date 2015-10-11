@@ -56,6 +56,7 @@ ENDCG
 Subshader {
 	Tags { "RenderType"="Opaque" }
 	Pass {
+	Blend SrcAlpha OneMinusSrcAlpha
 
 CGPROGRAM
 #pragma vertex vert
